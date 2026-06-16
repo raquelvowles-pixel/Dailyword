@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { addUser } from "../../../lib/users.js";
 import { getRandomVerse } from "../../../lib/verses.js";
 import { buildWelcomeEmail } from "../../../lib/email.js";
 
@@ -13,12 +12,6 @@ export async function POST(request) {
     }
     if ((delivery === "whatsapp" || delivery === "both") && (!whatsapp || whatsapp.length < 10)) {
       return NextResponse.json({ error: "Valid WhatsApp number is required." }, { status: 400 });
-    }
-
-    const result = addUser({ name: name.trim(), email: email?.trim().toLowerCase() || "", whatsapp: whatsapp || "", delivery: delivery || "email" });
-
-    if (!result.success && result.reason === "already_exists") {
-      return NextResponse.json({ error: "This email is already subscribed!" }, { status: 409 });
     }
 
     const verse = getRandomVerse();
