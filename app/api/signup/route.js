@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import { addUser } from "../../../lib/users.js";
 import { getRandomVerse } from "../../../lib/verses.js";
 import { buildWelcomeEmail } from "../../../lib/email.js";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request) {
   try {
@@ -28,17 +25,24 @@ export async function POST(request) {
 
     if (delivery === "email" || delivery === "both") {
       const { subject, html } = buildWelcomeEmail({ name, verse });
-      await resend.emails.send({
-        from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
-        to: email,
-        subject,
-        html: html.replace("{{EMAIL}}", encodeURIComponent(email)),
+
+      await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": process.env.BREVO_API_KEY,
+        },
+        body: JSON.stringify({
+          sender: { name: process.env.FROM_NAME, email: process.env.FROM_EMAIL },
+          to: [{ email: email, name: name }],
+          subject: subject,
+          htmlContent: html.replace("{{EMAIL}}", encodeURIComponent(email)),
+        }),
       });
     }
 
     if (delivery === "whatsapp" || delivery === "both") {
       console.log(`WhatsApp signup: +91${whatsapp} — verse: ${verse.reference}`);
-      // TODO: Add Twilio WhatsApp API call here when ready
     }
 
     return NextResponse.json({ success: true, verse });
