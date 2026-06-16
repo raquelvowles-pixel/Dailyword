@@ -26,7 +26,6 @@ export async function POST(request) {
 
     const verse = getRandomVerse();
 
-    // Send welcome email if user wants email
     if (delivery === "email" || delivery === "both") {
       const { subject, html } = buildWelcomeEmail({ name, verse });
       await resend.emails.send({
@@ -37,12 +36,9 @@ export async function POST(request) {
       });
     }
 
-    // WhatsApp sending note:
-    // To send WhatsApp messages, integrate Twilio or WATI here.
-    // For now we store the number and can send manually or via a future integration.
     if (delivery === "whatsapp" || delivery === "both") {
       console.log(`WhatsApp signup: +91${whatsapp} — verse: ${verse.reference}`);
-      // TODO: Add Twilio WhatsApp API call here
+      // TODO: Add Twilio WhatsApp API call here when ready
     }
 
     return NextResponse.json({ success: true, verse });
