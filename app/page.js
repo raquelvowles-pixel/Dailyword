@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -9,11 +9,31 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [verse, setVerse] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isIOS, setIsIOS] = useState(false);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    setIsIOS(/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()));
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+    window.addEventListener("appinstalled", () => setInstalled(true));
+  }, []);
+
+  async function handleInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+      setDeferredPrompt(null);
+    }
+  }
 
   async function handleSignup(e) {
     e.preventDefault();
     setError("");
-
     if (!name.trim()) { setError("Please enter your name."); return; }
     if (delivery === "email" || delivery === "both") {
       if (!email.trim() || !email.includes("@")) { setError("Please enter a valid email address."); return; }
@@ -21,7 +41,6 @@ export default function Home() {
     if (delivery === "whatsapp" || delivery === "both") {
       if (!whatsapp.trim() || whatsapp.length < 10) { setError("Please enter a valid WhatsApp number."); return; }
     }
-
     setLoading(true);
     try {
       const res = await fetch("/api/signup", {
@@ -154,6 +173,50 @@ export default function Home() {
             <p style={styles.verseRef}>— {verse.reference}</p>
           </div>
 
+          {/* Install App Section */}
+          {!installed && (
+            <div style={styles.installBox}>
+              <p style={styles.installTitle}>📱 Add DailyWord to your home screen</p>
+
+              {/* Android install button */}
+              {deferredPrompt && (
+                <button onClick={handleInstall} style={styles.installBtn}>
+                  ⬇️ Install App on Android
+                </button>
+              )}
+
+              {/* iPhone instructions */}
+              {isIOS && (
+                <div style={styles.iosSteps}>
+                  <div style={styles.iosStep}>
+                    <span style={styles.stepNum}>1</span>
+                    <span>Tap the <strong>Share button</strong> at the bottom of Safari ⬆️</span>
+                  </div>
+                  <div style={styles.iosStep}>
+                    <span style={styles.stepNum}>2</span>
+                    <span>Scroll down and tap <strong>"Add to Home Screen"</strong></span>
+                  </div>
+                  <div style={styles.iosStep}>
+                    <span style={styles.stepNum}>3</span>
+                    <span>Tap <strong>"Add"</strong> — DailyWord appears on your home screen! 🎉</span>
+                  </div>
+                </div>
+              )}
+
+              {!deferredPrompt && !isIOS && (
+                <p style={styles.installHint}>
+                  Open this page in your phone browser to install the app on your home screen.
+                </p>
+              )}
+            </div>
+          )}
+
+          {installed && (
+            <div style={{ ...styles.installBox, background: "#E1F5EE", borderColor: "#5DCAA5" }}>
+              <p style={{ ...styles.installTitle, color: "#0F6E56" }}>✅ App installed! Open DailyWord from your home screen anytime.</p>
+            </div>
+          )}
+
           <p style={styles.sharePrompt}>Know someone who'd love this? Share the link with them 💜</p>
           <button
             onClick={() => {
@@ -206,6 +269,13 @@ const styles = {
   verseTheme: { fontFamily: "Arial, sans-serif", fontSize: 12, color: "#534AB7", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 12px" },
   verseText: { fontFamily: "Georgia, serif", fontSize: 18, color: "#26215C", lineHeight: 1.75, margin: "0 0 14px", fontStyle: "italic" },
   verseRef: { fontFamily: "Arial, sans-serif", fontSize: 13, color: "#534AB7", fontWeight: 600, margin: 0 },
-  sharePrompt: { fontFamily: "Arial, sans-serif", fontSize: 14, color: "#888", margin: "0 0 14px", lineHeight: 1.6 },
+  sharePrompt: { fontFamily: "Arial, sans-serif", fontSize: 14, color: "#888", margin: "16px 0 14px", lineHeight: 1.6 },
   footer: { fontFamily: "Arial, sans-serif", fontSize: 12, color: "#bbb", marginTop: 28, textAlign: "center" },
+  installBox: { background: "#EEEDFE", border: "1px solid #AFA9EC", borderRadius: 12, padding: "16px 18px", margin: "0 0 20px" },
+  installTitle: { fontFamily: "Arial, sans-serif", fontSize: 14, fontWeight: 600, color: "#3C3489", margin: "0 0 12px" },
+  installBtn: { width: "100%", padding: "11px", background: "#3C3489", color: "#CECBF6", border: "none", borderRadius: 10, fontSize: 14, fontFamily: "Arial, sans-serif", fontWeight: 600, cursor: "pointer", marginBottom: 8 },
+  iosSteps: { display: "flex", flexDirection: "column", gap: 10 },
+  iosStep: { display: "flex", alignItems: "flex-start", gap: 10, fontFamily: "Arial, sans-serif", fontSize: 13, color: "#444", lineHeight: 1.5 },
+  stepNum: { minWidth: 24, height: 24, background: "#3C3489", color: "#CECBF6", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600 },
+  installHint: { fontFamily: "Arial, sans-serif", fontSize: 13, color: "#888", margin: 0, lineHeight: 1.6 },
 };
