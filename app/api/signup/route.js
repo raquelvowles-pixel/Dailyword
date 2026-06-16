@@ -1,44 +1,51 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { addUser } from "@/lib/users";
-import { getRandomVerse } from "@/lib/verses";
-import { buildWelcomeEmail } from "@/lib/email";
+import { addUser } from "../../../lib/users.js";
+import { getRandomVerse } from "../../../lib/verses.js";
+import { buildWelcomeEmail } from "../../../lib/email.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request) {
   try {
-    const { name, email } = await request.json();
+    const { name, email, whatsapp, delivery } = await request.json();
 
-    // Basic validation
-    if (!name || !email || !email.includes("@")) {
-      return NextResponse.json({ error: "Name and valid email are required." }, { status: 400 });
+    if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
+    if ((delivery === "email" || delivery === "both") && (!email || !email.includes("@"))) {
+      return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
+    }
+    if ((delivery === "whatsapp" || delivery === "both") && (!whatsapp || whatsapp.length < 10)) {
+      return NextResponse.json({ error: "Valid WhatsApp number is required." }, { status: 400 });
     }
 
-    // Save user to our JSON store
-    const result = addUser({ name: name.trim(), email: email.trim().toLowerCase() });
+    const result = addUser({ name: name.trim(), email: email?.trim().toLowerCase() || "", whatsapp: whatsapp || "", delivery: delivery || "email" });
 
     if (!result.success && result.reason === "already_exists") {
       return NextResponse.json({ error: "This email is already subscribed!" }, { status: 409 });
     }
 
-    // Pick a random verse for the welcome email
     const verse = getRandomVerse();
 
-    // Build and send the welcome email
-    const { subject, html } = buildWelcomeEmail({ name, verse });
+    // Send welcome email if user wants email
+    if (delivery === "email" || delivery === "both") {
+      const { subject, html } = buildWelcomeEmail({ name, verse });
+      await resend.emails.send({
+        from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+        to: email,
+        subject,
+        html: html.replace("{{EMAIL}}", encodeURIComponent(email)),
+      });
+    }
 
-    await resend.emails.send({
-      from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
-      to: email,
-      subject,
-      html: html.replace("{{EMAIL}}", encodeURIComponent(email)),
-    });
+    // WhatsApp sending note:
+    // To send WhatsApp messages, integrate Twilio or WATI here.
+    // For now we store the number and can send manually or via a future integration.
+    if (delivery === "whatsapp" || delivery === "both") {
+      console.log(`WhatsApp signup: +91${whatsapp} — verse: ${verse.reference}`);
+      // TODO: Add Twilio WhatsApp API call here
+    }
 
-    return NextResponse.json({
-      success: true,
-      verse, // Send verse back so the frontend can display it immediately
-    });
+    return NextResponse.json({ success: true, verse });
 
   } catch (error) {
     console.error("Signup error:", error);
